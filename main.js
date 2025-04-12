@@ -2,42 +2,35 @@
 const globe = Globe()(document.getElementById('globeViz'))
   .globeImageUrl('//unpkg.com/three-globe/example/img/earth-dark.jpg')
   .showAtmosphere(true)
-  .atmosphereColor('lightskyblue')
-  .atmosphereAltitude(0.25);
+  .atmosphereColor('purple')
+  .atmosphereAltitude(0.25)
+  .arcsData([])
+  .arcColor(d => d.color || 'blue')
+  .arcStroke(0.5)
+  .arcAltitudeAutoScale(true)
+  .ringsData([])
+  .ringColor(d => d.color || 'white')
+  .ringMaxRadius(d => d.maxRadius || 1)
+  .ringPropagationSpeed(d => d.propagationSpeed || 0.5)
+  .ringRepeatPeriod(d => d.repeatPeriod || 1000);
+
+const popupLeft = document.getElementById('popup-left');
+const popupRight = document.getElementById('popup-right');
 
 // Important countries
 const importantCountries = [
-  "United States of America",
-  "Jamaica",
-  "Germany",
-  "United Kingdom",
-  "Japan",
-  "Spain",
-  "Netherlands",
-  "South Korea"
+  "United States of America", "Jamaica", "Germany", "United Kingdom",
+  "Japan", "Spain", "Netherlands", "South Korea"
 ];
-
-// Active country
-let activeCountry = null;
-
-// Function to dynamically determine country colors
-const getPolygonCapColor = polygon => {
-  if (!importantCountries.includes(polygon.properties.ADMIN)) {
-    return 'rgba(100, 100, 100, 0.1)';
-  }
-  return (polygon.properties.ADMIN === activeCountry)
-    ? 'rgba(255, 255, 0, 0.8)'  // Highlight active country
-    : 'rgba(255, 215, 0, 0.6)'; // Gold for important but inactive
-};
 
 let lastCoords = null;
 let lastSection = null;
 let allArcs = [];
+let allRings = [];
 
 const audio = document.getElementById('bg-music');
 audio.volume = 0.5;
 
-// Setup ripple canvas
 const { canvas: rippleCanvas, ctx: rippleCtx } = createRippleCanvas();
 const title = document.getElementById('title');
 
@@ -68,16 +61,29 @@ fetch('countries/countries.geo.json')
   .then(res => res.json())
   .then(countries => {
     globe.polygonsData(countries.features)
-      .polygonCapColor(getPolygonCapColor)
+      .polygonCapColor('rgba(111, 0, 255, 0.32)')
       .polygonSideColor(() => 'rgba(75, 0, 130, 0.8)')
       .polygonStrokeColor(() => 'white')
       .polygonAltitude(0.01);
 
-    // Only setup scrolling AFTER globe is ready
-    setupScrollBehavior();
+    // Initialize with a pulsating ring for Jamaica
+    const jamaicaTarget = cityTargets["section-60s-70s-jamaica"];
+    if (jamaicaTarget) {
+      allRings.push({
+        lat: jamaicaTarget.lat,
+        lng: jamaicaTarget.lng,
+        maxRadius: 1,
+        propagationSpeed: 0.5,
+        repeatPeriod: 1000,
+        color: 'white'
+      });
+      globe.ringsData(allRings);
+    }
+
+    setupScrollBehavior(); // Only after globe ready
   });
 
-// Auto-rotate globe
+// Auto-rotate globe initially
 globe.controls().autoRotate = true;
 globe.controls().autoRotateSpeed = 0.3;
 
@@ -94,71 +100,84 @@ window.addEventListener('scroll', () => {
   const blurValue = 8 * (1 - scrollProgress);
   document.getElementById('globeViz').style.filter = `blur(${blurValue}px)`;
   document.getElementById('title').style.opacity = 1 - scrollProgress;
+
+  // ✨ Hide popups during intro
+  if (scrollProgress < 1) {
+    popupLeft.style.opacity = 0;
+    popupRight.style.opacity = 0;
+  }
 });
 
 // Resume audio on click
 document.body.addEventListener('click', initAudioContext, { once: true });
 
-// Mouse move tilts title
-document.addEventListener('mousemove', (event) => {
-  const x = (event.clientX / window.innerWidth) - 0.5;
-  const y = (event.clientY / window.innerHeight) - 0.5;
-  rotateX = y * 10;
-  rotateY = x * 20;
-  updateTitleTransform();
-});
-
 // ====== Helper functions ======
 
 function setupScrollBehavior() {
-const observer = new IntersectionObserver((entries) => {
+  const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-    if (entry.isIntersecting) {
-        const sectionId = entry.target.id;
+      const sectionId = entry.target.id;
+      if (entry.isIntersecting) {
         if (cityTargets[sectionId] && sectionId !== lastSection) {
-        const { lat, lng, name } = cityTargets[sectionId];
+          const { lat, lng, name } = cityTargets[sectionId];
 
-        // Determine activeCountry
-        if (name.includes("USA")) activeCountry = "United States of America";
-        else if (name.includes("Jamaica")) activeCountry = "Jamaica";
-        else if (name.includes("Germany")) activeCountry = "Germany";
-        else if (name.includes("United Kingdom") || name.includes("London") || name.includes("Manchester")) activeCountry = "United Kingdom";
-        else if (name.includes("Japan")) activeCountry = "Japan";
-        else if (name.includes("Spain") || name.includes("Ibiza")) activeCountry = "Spain";
-        else if (name.includes("Netherlands")) activeCountry = "Netherlands";
-        else if (name.includes("South Korea")) activeCountry = "South Korea";
-        else activeCountry = null;
+          // ✨ Update popups
+          popupLeft.innerHTML = `<strong>${name}</strong>`;
+          popupRight.innerHTML = `<strong>${name} EDM Event</strong><br>Important EDM history info here.`;
+          popupLeft.style.opacity = 1;
+          popupRight.style.opacity = 1;
 
-        // Update globe colors
-        globe.polygonCapColor(getPolygonCapColor);
-        globe.polygonsData(globe.polygonsData()); // This line should trigger the re-evaluation
-
-        // Draw arc
-        if (lastCoords) {
+          // ✨ Arc and Ring
+          if (lastCoords) {
             allArcs.push({
-            startLat: lastCoords.lat,
-            startLng: lastCoords.lng,
-            endLat: lat,
-            endLng: lng,
-            color: ['white']
+              startLat: lastCoords.lat,
+              startLng: lastCoords.lng,
+              endLat: lat,
+              endLng: lng,
+              color: ['white', 'purple']
             });
             globe.arcsData(allArcs);
-        }
 
-        lastCoords = { lat, lng };
-        lastSection = sectionId;
-        globe.pointOfView({ lat, lng, altitude: 1.5 }, 2000);
+            allRings.push({
+              lat,
+              lng,
+              maxRadius: 1,
+              propagationSpeed: 0.5,
+              repeatPeriod: 1000,
+              color: 'white'
+            });
+            globe.ringsData(allRings);
+          }
+
+          const currentPOV = globe.pointOfView();
+          const currentBearing = currentPOV.bearing;
+          const currentPitch = currentPOV.pitch;
+
+          lastCoords = { lat, lng };
+          lastSection = sectionId;
+          globe.pointOfView({ lat, lng, altitude: 1.5, bearing: currentBearing, pitch: currentPitch }, 2000);
+
+          // ✨ Stop auto-rotate
+          globe.controls().autoRotate = false;
         }
-    }
+      } else {
+        // ✨ Hide popups when section not active
+        popupLeft.style.opacity = 0;
+        popupRight.style.opacity = 0;
+      }
     });
-}, { threshold: 0.5 });
+  }, {
+  root: null,
+  threshold: 0,
+  rootMargin: '-20% 0px -80% 0px' // ✨ triggers when section hits 20% from top
+  });
 
-Object.keys(cityTargets).forEach(sectionId => {
+  Object.keys(cityTargets).forEach(sectionId => {
     const sectionEl = document.getElementById(sectionId);
     if (sectionEl) {
-    observer.observe(sectionEl);
+      observer.observe(sectionEl);
     }
-});
+  });
 }
 
 let titleScale = 1;
