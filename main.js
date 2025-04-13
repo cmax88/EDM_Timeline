@@ -23,13 +23,103 @@ const importantCountries = [
   "Japan", "Spain", "Netherlands", "South Korea"
 ];
 
+const popupInfo = {
+  "section-60s-70s-jamaica": {
+    left: "Kingston, Jamaica",
+    right: "Dub Music Roots (1960s–70s)",
+    audio: "music/SpotifyMate.com - Electric Relaxation - A Tribe Called Quest.mp3"
+  },
+  "section-70s-munich": {
+    left: "Munich, Germany",
+    right: "Synth Disco Origins (1970s)",
+    audio: "music/SpotifyMate.com - Pleadians - Daggz.mp3"
+  },
+  "section-70s-nyc": {
+    left: "New York City, USA",
+    right: "Disco Explosion (1970s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-70s-tokyo": {
+    left: "Tokyo, Japan",
+    right: "Synthpop Beginnings (1970s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-80s-detroit": {
+    left: "Detroit, USA",
+    right: "Birth of Techno (1980s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-80s-chicago": {
+    left: "Chicago, USA",
+    right: "House Music Revolution (1980s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-80s-london": {
+    left: "London, UK",
+    right: "Post-Disco Underground (1980s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-80s-berlin": {
+    left: "Berlin, Germany",
+    right: "Techno Scene Rises (1980s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-80s-ibiza": {
+    left: "Ibiza, Spain",
+    right: "Balearic Beat Explosion (1980s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-90s-manchester": {
+    left: "Manchester, UK",
+    right: "Rave Culture Boom (1990s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-90s-frankfurt": {
+    left: "Frankfurt, Germany",
+    right: "Trance Music Origins (1990s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-90s-london-dubstep": {
+    left: "London, UK",
+    right: "Dubstep Emergence (1990s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-2000s-miami": {
+    left: "Miami, USA",
+    right: "Ultra Music Festival (2000s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-2010s-lasvegas": {
+    left: "Las Vegas, USA",
+    right: "Festival Boom (2010s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-2010s-amsterdam": {
+    left: "Amsterdam, Netherlands",
+    right: "Amsterdam Dance Event (2010s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  },
+  "section-2020s-seoul": {
+    left: "Seoul, South Korea",
+    right: "EDM & K-pop Fusion (2020s)",
+    audio: "audio/king_tubby_meets_rockers_uptown.mp3"
+  }
+};
+
 let lastCoords = null;
 let lastSection = null;
 let allArcs = [];
 let allRings = [];
+let currentAudio = null;
+let audioContext = null;
+let analyser = null;
+let dataArray = null;
+let sourceNode = null;
 
 const audio = document.getElementById('bg-music');
-audio.volume = 0.5;
+audio.volume = 0;
+
+const musicPlayer = document.getElementById('music-player');
 
 const { canvas: rippleCanvas, ctx: rippleCtx } = createRippleCanvas();
 const title = document.getElementById('title');
@@ -113,6 +203,16 @@ document.body.addEventListener('click', initAudioContext, { once: true });
 
 // ====== Helper functions ======
 
+
+
+function playMusic(src) {
+  musicPlayer.pause();
+  musicPlayer.src = src;
+  musicPlayer.load();
+  musicPlayer.volume = 0.5;
+  musicPlayer.play();
+}
+
 function setupScrollBehavior() {
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -120,12 +220,21 @@ function setupScrollBehavior() {
       if (entry.isIntersecting) {
         if (cityTargets[sectionId] && sectionId !== lastSection) {
           const { lat, lng, name } = cityTargets[sectionId];
+          const info = popupInfo[sectionId];
 
           // ✨ Update popups
-          popupLeft.innerHTML = `<strong>${name}</strong>`;
-          popupRight.innerHTML = `<strong>${name} EDM Event</strong><br>Important EDM history info here.`;
+          if (info) {
+            popupLeft.innerHTML = `<strong>${info.left}</strong>`;
+            popupRight.innerHTML = `<strong>${info.right}</strong>`;
+            playMusic(info.audio);
+          } else {
+            // fallback if not defined
+            popupLeft.innerHTML = `<strong>${name}</strong>`;
+            popupRight.innerHTML = `<strong>${name} EDM Event</strong>`;
+          }      
           popupLeft.style.opacity = 1;
           popupRight.style.opacity = 1;
+          
 
           // ✨ Arc and Ring
           if (lastCoords) {
